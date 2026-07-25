@@ -8,7 +8,7 @@ import TerminalView from "./components/Terminal.vue";
 import GuiPanel from "./components/GuiPanel.vue";
 import ToolsPane from "./components/ToolsPane.vue";
 import CollectionsBrowseOverlay from "./components/CollectionsBrowseOverlay.vue";
-import AccountingOverlay from "./components/AccountingOverlay.vue";
+import RepoPicker from "./components/RepoPicker.vue";
 import WikiBrowseOverlay from "./components/WikiBrowseOverlay.vue";
 import PrsOverlay from "./components/PrsOverlay.vue";
 import FilesOverlay from "./components/FilesOverlay.vue";
@@ -19,6 +19,7 @@ import { useSessions, type Filter } from "./composables/useSessions";
 import { browseClose } from "./composables/useCollectionBrowse";
 import { registerChatOpener, startCollectionChat } from "./composables/useChatLauncher";
 import { useAppConfig } from "./composables/useAppConfig";
+import { useEscapeToClose } from "./composables/useEscapeToClose";
 import { useDirConfig } from "./composables/useDirConfig";
 import { useFaviconState } from "./composables/useFaviconState";
 import { usePendingScript, type PendingCommand } from "./composables/usePendingScript";
@@ -205,6 +206,7 @@ function configureAppearance(): void {
 function selectSession(id: string, agent: "claude" | "codex" = "claude") {
   if (id !== activeId.value) clearDraftHint(); // switching away from a preparing draft
   singleAgent.value = agent; // resume the row's agent (codex rows reconnect via /ws/codex)
+  singleCwd.value = null; // resuming by id — the picked repo belongs to NEW sessions only
   activeId.value = id;
   connectKey.value++;
 }
@@ -257,14 +259,28 @@ registerChatOpener((id, opts) => {
   if (opts?.draft) showDraftHint();
 });
 
+// New sessions start from the repository chooser (the baseDir listing) — the same list
+// the grid cell offers — instead of silently launching in the server default dir. The
+// picked path rides to the server as the connection's cwd (singleCwd).
+const repoPickerOpen = ref(false);
+const repoPickerAgent = ref<"claude" | "codex">("claude");
+const singleCwd = ref<string | null>(null);
+useEscapeToClose(repoPickerOpen, () => (repoPickerOpen.value = false));
+
 function newSession() {
-  singleAgent.value = "claude";
-  activeId.value = null;
-  connectKey.value++;
+  repoPickerAgent.value = "claude";
+  repoPickerOpen.value = true;
 }
 
 function newCodexSession() {
-  singleAgent.value = "codex";
+  repoPickerAgent.value = "codex";
+  repoPickerOpen.value = true;
+}
+
+function launchInRepo(path: string) {
+  repoPickerOpen.value = false;
+  singleAgent.value = repoPickerAgent.value;
+  singleCwd.value = path;
   activeId.value = null;
   connectKey.value++;
 }
@@ -334,6 +350,7 @@ function onSession(id: string) {
           :style="{ flex: `0 0 ${terminalWidth}px` }"
           persist-key="single"
           :session-id="activeId"
+          :cwd="singleCwd"
           :codex="singleAgent === 'codex'"
           :connect-key="connectKey"
           :dir-theme="singleDirConfig.theme"
@@ -370,7 +387,6 @@ function onSession(id: string) {
     <CollectionsBrowseOverlay />
     <!-- Full-screen accounting view; opened by the toolbar's account_balance button
          (driven by useAccountingView). Mutually exclusive with the browser above. -->
-    <AccountingOverlay />
     <!-- Full-screen read-only wiki browser; opened by the toolbar's menu_book button
          (driven by useWikiBrowse). Mutually exclusive with the overlays above. -->
     <WikiBrowseOverlay />
@@ -378,6 +394,29 @@ function onSession(id: string) {
     <PrsOverlay />
     <!-- Full-screen file explorer + editor; opened by a terminal header's Files button. -->
     <FilesOverlay />
+    <div
+      v-if="repoPickerOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.55)] p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose a repository"
+      @click.self="repoPickerOpen = false"
+    >
+      <div class="flex max-h-[80vh] w-full max-w-[420px] flex-col gap-2 rounded-xl border border-border bg-panel p-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+        <div class="flex items-center justify-between">
+          <span class="font-sans text-[13px] font-semibold text-fg">New {{ repoPickerAgent === "codex" ? "Codex" : "Claude" }} session — choose a repository</span>
+          <button
+            type="button"
+            class="inline-flex h-[26px] w-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-[16px] text-secondary hover:bg-hover hover:text-fg"
+            aria-label="Close"
+            @click="repoPickerOpen = false"
+          >
+            ✕
+          </button>
+        </div>
+        <RepoPicker @pick="launchInRepo" @launch="launchInRepo" />
+      </div>
+    </div>
     <AppSettingsModal v-if="showSettings" :cwd="effectiveCwd" :session-id="activeId" @configure-appearance="configureAppearance" @close="closeSettings" />
   </div>
 </template>

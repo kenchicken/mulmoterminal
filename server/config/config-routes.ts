@@ -23,6 +23,7 @@ import { type TerminalSubmitMode } from "../../common/terminalSubmit.js";
 import { launchOptions } from "./launch-options.js";
 import { badArrayField, badNullableArrayField } from "./config-body.js";
 import { getUpdateStatus } from "./update-status.js";
+import { listRepos } from "./repos.js";
 
 const CONFIG_FILE = path.join(os.homedir(), ".mulmoterminal", "config.json");
 let config: AppConfig = loadAppConfig(CONFIG_FILE);
@@ -87,6 +88,12 @@ export function mountConfigRoutes(app: Express, claudeCwd: string): void {
   // The update notice for the header's "update available" badge, from the check the server
   // ran at startup (refreshUpdateStatus). Served from memory; the client re-fetches once so a
   // request that beat the async check still picks the notice up.
+  // The repository chooser: baseDir's immediate subdirectories, listed fresh on every
+  // request so a newly-cloned repo appears without a restart or a config edit.
+  app.get("/api/repos", (_req, res) => {
+    res.json({ baseDir: config.baseDir, repos: listRepos(config.baseDir) });
+  });
+
   app.get("/api/update-status", (_req, res) => {
     res.json(getUpdateStatus());
   });

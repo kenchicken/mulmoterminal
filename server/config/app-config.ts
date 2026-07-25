@@ -21,6 +21,10 @@ import { DEFAULT_TERMINAL_SUBMIT_MODE, isTerminalSubmitMode, type TerminalSubmit
 
 export interface AppConfig {
   cwdPresets: CwdPreset[];
+  // Absolute path to the directory whose immediate subdirectories are the user's
+  // repositories. When set, the launch UIs offer that listing (GET /api/repos) as the
+  // session-start chooser. null = feature off (presets/free input only).
+  baseDir: string | null;
   // Absolute path to a user-supplied audio file played as the attention sound, or
   // null to use the built-in synthesized chime (the default — no bundled asset).
   soundFile: string | null;
@@ -127,6 +131,14 @@ export function sanitizePushEnabled(input: unknown): boolean {
   return input === true;
 }
 
+// Same contract as the sound file: a non-empty ABSOLUTE path or null. Relative values
+// would resolve against the server's cwd and list an unintended directory.
+export function sanitizeBaseDir(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  return trimmed && path.isAbsolute(trimmed) ? trimmed : null;
+}
+
 // The Enter-key submit/newline byte mapping. Anything that isn't a known mode (missing,
 // typo, wrong type) falls back to the standard binding, so a bad value never changes how
 // Enter behaves.
@@ -154,6 +166,7 @@ export function sanitizeWorklogIntervalHours(input: unknown): number {
 // race a concurrent write turning the file corrupt between the two reads).
 export const emptyConfig = (): AppConfig => ({
   cwdPresets: [],
+  baseDir: null,
   soundFile: null,
   prRepos: [],
   launchers: [],
@@ -184,6 +197,7 @@ function sanitizeAppConfig(raw: unknown): AppConfig {
   const o = (raw ?? {}) as Record<string, unknown>;
   return {
     cwdPresets: sanitizePresets(o.cwdPresets),
+    baseDir: sanitizeBaseDir(o.baseDir),
     soundFile: sanitizeSoundFile(o.soundFile),
     prRepos: sanitizeRepos(o.prRepos),
     launchers: sanitizeLaunchers(o.launchers),
@@ -249,6 +263,7 @@ export function backupCorruptConfig(file: string): string | null {
 export function mergeConfigUpdate(base: AppConfig, body: Record<string, unknown>): AppConfig {
   return {
     cwdPresets: body.cwdPresets !== undefined ? sanitizePresets(body.cwdPresets) : base.cwdPresets,
+    baseDir: body.baseDir !== undefined ? sanitizeBaseDir(body.baseDir) : base.baseDir,
     soundFile: body.soundFile !== undefined ? sanitizeSoundFile(body.soundFile) : base.soundFile,
     prRepos: body.prRepos !== undefined ? sanitizeRepos(body.prRepos) : base.prRepos,
     launchers: body.launchers !== undefined ? sanitizeLaunchers(body.launchers) : base.launchers,
@@ -269,6 +284,7 @@ export function mergeConfigUpdate(base: AppConfig, body: Record<string, unknown>
 export function toPublicAppConfig(config: AppConfig): AppConfig {
   return {
     cwdPresets: config.cwdPresets,
+    baseDir: config.baseDir,
     providers: config.providers,
     soundFile: config.soundFile,
     prRepos: config.prRepos,

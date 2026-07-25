@@ -131,6 +131,7 @@ describe("sanitizeTerminalSubmit", () => {
 describe("loadAppConfig / saveAppConfig", () => {
   const base = {
     cwdPresets: [],
+    baseDir: null,
     soundFile: null,
     prRepos: [],
     launchers: [],
@@ -148,6 +149,7 @@ describe("loadAppConfig / saveAppConfig", () => {
     const file = path.join(dir, "nested", "config.json"); // nested → mkdir is exercised
     const cfg = {
       cwdPresets: [{ label: "x", path: "/x" }],
+      baseDir: "/repos",
       soundFile: "/s.wav",
       prRepos: ["o/r"],
       launchers: [{ label: "Shell", command: "$SHELL" }],
@@ -191,6 +193,7 @@ describe("loadAppConfig / saveAppConfig", () => {
     );
     expect(loadAppConfig(file)).toEqual({
       cwdPresets: [{ label: "a", path: "/a" }],
+      baseDir: null,
       soundFile: null,
       prRepos: ["o/r"],
       launchers: [{ label: "S", command: "sh" }],
@@ -286,6 +289,7 @@ describe("backupCorruptConfig", () => {
 describe("#741 corrupt config is not silently wiped by a partial update", () => {
   const richConfig = {
     cwdPresets: [{ label: "proj", path: "/proj" }],
+    baseDir: null,
     soundFile: null,
     prRepos: ["o/r"],
     launchers: [{ label: "Shell", command: "$SHELL" }],

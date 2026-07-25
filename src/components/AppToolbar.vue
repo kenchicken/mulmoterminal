@@ -7,7 +7,6 @@ import RemoteHostControl from "./RemoteHostControl.vue";
 import LauncherButton from "./LauncherButton.vue";
 import { useShortcuts } from "../composables/useShortcuts";
 import { useCollectionBrowse, browseGotoIndex, browseGotoDetail } from "../composables/useCollectionBrowse";
-import { useAccountingView, accountingViewOpen } from "../composables/useAccountingView";
 import { useWikiBrowse, wikiGotoIndex, wikiGotoTag } from "../composables/useWikiBrowse";
 import { usePrsView, prsGotoIndex } from "../composables/usePrsView";
 import { useSoundEnabled } from "../composables/useSoundEnabled";
@@ -43,7 +42,6 @@ const summaryTitle = computed(() => summary.value.title);
 const hasSummary = computed(() => summary.value.show);
 const { shortcuts } = useShortcuts();
 const { view: browseView } = useCollectionBrowse();
-const { isOpen: accountingOpen } = useAccountingView();
 const { isOpen: wikiOpen } = useWikiBrowse();
 const { isOpen: prsOpen } = usePrsView();
 const { enabled: soundEnabled, toggle: toggleSound } = useSoundEnabled();
@@ -74,9 +72,8 @@ async function copyUpdateCommand(): Promise<void> {
 
 const inGrid = computed(() => route.name === "terminals");
 const inSingle = computed(() => !inGrid.value);
-const chatActive = computed(() => inSingle.value && browseView.value.mode === "closed" && !accountingOpen.value && !wikiOpen.value && !prsOpen.value);
+const chatActive = computed(() => inSingle.value && browseView.value.mode === "closed" && !wikiOpen.value && !prsOpen.value);
 const collectionsActive = computed(() => browseView.value.mode === "index" && browseView.value.kind === "collection");
-const accountingActive = computed(() => accountingOpen.value);
 const wikiActive = computed(() => wikiOpen.value);
 const prsActive = computed(() => prsOpen.value);
 function favActive(s: Shortcut): boolean {
@@ -94,9 +91,6 @@ function showCollections(): void {
 }
 function showFavorite(s: Shortcut): void {
   browseGotoDetail(s.kind, s.slug);
-}
-function showAccounting(): void {
-  accountingViewOpen();
 }
 function showWiki(): void {
   wikiGotoIndex();
@@ -120,7 +114,6 @@ function showPrs(): void {
       <LauncherButton icon="chat" title="Chat" label="Chat" :active="chatActive" @click="showChat" />
       <LauncherButton icon="grid_view" title="Grid (multiple terminals)" label="Grid view" :active="inGrid" @click="showGrid" />
       <LauncherButton icon="apps" title="Collections" label="Collections" :active="collectionsActive" @click="showCollections" />
-      <LauncherButton icon="account_balance" title="Accounting" label="Accounting" :active="accountingActive" @click="showAccounting" />
       <LauncherButton icon="call_merge" title="Pull requests" label="Pull requests" :active="prsActive" @click="showPrs" />
       <LauncherButton icon="menu_book" title="Wiki" label="Wiki" :active="wikiActive" @click="showWiki" />
       <LauncherButton

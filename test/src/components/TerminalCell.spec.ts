@@ -45,11 +45,16 @@ const dotClass = (w: ReturnType<typeof mount>) => w.find(".cell-dot").classes();
 
 // Route by URL: /api/scripts (run list), /api/sessions (resume list), or
 // /api/session/:id (activity).
-function mockFetch(sessions: { id: string; title: string; mtime: number }[] = [], scripts: { index: number; label: string; command: string }[] = []) {
+function mockFetch(
+  sessions: { id: string; title: string; mtime: number }[] = [],
+  scripts: { index: number; label: string; command: string }[] = [],
+  repos: { name: string; path: string; git: boolean }[] = [],
+) {
   globalThis.fetch = vi.fn(async (url: string) => {
     const u = String(url);
     if (u.includes("/api/scripts")) return { ok: true, json: async () => ({ cwd: "/home/me/proj", scripts }) };
     if (u.includes("/api/sessions")) return { ok: true, json: async () => ({ sessions }) };
+    if (u.includes("/api/repos")) return { ok: true, json: async () => ({ baseDir: "/base", repos }) };
     return { ok: true, json: async () => ({ working: false, waiting: false, lastPrompt: null }) };
   }) as unknown as typeof fetch;
 }
@@ -303,14 +308,17 @@ describe("TerminalCell", () => {
     let n = 0;
     globalThis.fetch = vi.fn((url: string) => {
       if (String(url).includes("/api/sessions")) return n++ === 0 ? first.promise : second.promise;
+      if (String(url).includes("/api/repos"))
+        return Promise.resolve({ ok: true, json: async () => ({ baseDir: "/base", repos: [{ name: "B", path: "/B", git: true }] }) });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     }) as unknown as typeof fetch;
 
-    const w = mountCell(null, { defaultCwd: "/A", presets: [{ label: "B", path: "/B" }] });
+    const w = mountCell(null, { defaultCwd: "/A" });
     await nextTick(); // mount → fetch #1 (dir A) in flight
-    const chipB = w.findAll('[data-testid="cell-chip"]').find((c) => c.find('[data-testid="cell-chip-main"]').text() === "B");
-    if (!chipB) throw new Error("preset B not found");
-    await chipB.find('[data-testid="cell-chip-main"]').trigger("click"); // main click = fillDir → fetch #2 (dir B)
+    await flushPromises(); // settles ONLY the repos load — both deferred session fetches stay pending
+    const rowB = w.findAll('[data-testid="repo-row-pick"]').find((b) => b.text().includes("B"));
+    if (!rowB) throw new Error("repo B not found");
+    await rowB.trigger("click"); // row click = fillDir → fetch #2 (dir B)
 
     second.resolve({ ok: true, json: async () => ({ cwd: "/B", sessions: [{ id: "b-id", title: "B-sess", mtime: 1 }] }) });
     await flushPromises();
@@ -333,23 +341,25 @@ describe("TerminalCell", () => {
     expect(w.findComponent({ name: "TerminalView" }).props("cwd")).toBe("/resolved");
   });
 
-  it("clicking a preset chip's main button fills the dir WITHOUT launching (so the user can resume or start)", async () => {
-    const w = mountCell(null, { presets: [{ label: "proj", path: "/work/proj" }] });
+  it("clicking a repo row fills the dir WITHOUT launching (so the user can resume or start)", async () => {
+    mockFetch([], [], [{ name: "proj", path: "/work/proj", git: true }]);
+    const w = mountCell(null);
     await flushPromises();
-    const main = w.findAll('[data-testid="cell-chip-main"]').find((b) => b.text() === "proj");
-    if (!main) throw new Error("preset chip not found");
+    const main = w.findAll('[data-testid="repo-row-pick"]').find((b) => b.text().includes("proj"));
+    if (!main) throw new Error("repo row not found");
     await main.trigger("click");
     // No terminal — the main click only selects the directory (fill, not launch).
     expect(w.findComponent({ name: "TerminalView" }).exists()).toBe(false);
     expect((w.find('[data-testid="cell-dir-input"]').element as HTMLInputElement).value).toBe("/work/proj");
   });
 
-  it("the chip's ▶ launch button quick-starts a fresh session in its dir", async () => {
-    const w = mountCell(null, { presets: [{ label: "proj", path: "/work/proj" }] });
+  it("the repo row's ▶ launch button quick-starts a fresh session in its dir", async () => {
+    mockFetch([], [], [{ name: "proj", path: "/work/proj", git: true }]);
+    const w = mountCell(null);
     await flushPromises();
-    const chip = w.findAll('[data-testid="cell-chip"]').find((c) => c.find('[data-testid="cell-chip-main"]').text() === "proj");
-    if (!chip) throw new Error("preset chip not found");
-    await chip.find('[data-testid="cell-chip-launch"]').trigger("click");
+    const row = w.findAll('[data-testid="repo-row"]').find((r) => r.find('[data-testid="repo-row-pick"]').text().includes("proj"));
+    if (!row) throw new Error("repo row not found");
+    await row.find('[data-testid="repo-row-launch"]').trigger("click");
     const term = w.findComponent({ name: "TerminalView" });
     expect(term.exists()).toBe(true);
     expect(term.props("cwd")).toBe("/work/proj");
@@ -358,14 +368,15 @@ describe("TerminalCell", () => {
   it("filling a dir from a preset loads its sessions once — the debounced watch doesn't double-fetch", async () => {
     vi.useFakeTimers();
     try {
-      const w = mountCell(null, { defaultCwd: "/def", presets: [{ label: "x", path: "/x" }] });
+      mockFetch([], [], [{ name: "x", path: "/x", git: true }]);
+      const w = mountCell(null, { defaultCwd: "/def" });
       await flushPromises(); // settle the mount's own (immediate) load
       const sessionCalls = () =>
         (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.filter((c) => String(c[0]).includes("/api/sessions")).length;
       const before = sessionCalls();
 
-      const main = w.findAll('[data-testid="cell-chip-main"]').find((b) => b.text() === "x");
-      if (!main) throw new Error("preset chip not found");
+      const main = w.findAll('[data-testid="repo-row-pick"]').find((b) => b.text().includes("x"));
+      if (!main) throw new Error("repo row not found");
       await main.trigger("click"); // fillDir → one immediate /api/sessions load
       await flushPromises();
       const immediate = sessionCalls() - before;
@@ -384,7 +395,8 @@ describe("TerminalCell", () => {
   it("a preset fill cancels a pending typed-dir debounce (type-then-click doesn't double-fetch)", async () => {
     vi.useFakeTimers();
     try {
-      const w = mountCell(null, { defaultCwd: "/def", presets: [{ label: "x", path: "/x" }] });
+      mockFetch([], [], [{ name: "x", path: "/x", git: true }]);
+      const w = mountCell(null, { defaultCwd: "/def" });
       await flushPromises();
       const sessionCalls = () =>
         (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.filter((c) => String(c[0]).includes("/api/sessions")).length;
@@ -392,8 +404,8 @@ describe("TerminalCell", () => {
       await w.find('[data-testid="cell-dir-input"]').setValue("/typed"); // schedules a 300ms debounced load
       const before = sessionCalls();
 
-      const main = w.findAll('[data-testid="cell-chip-main"]').find((b) => b.text() === "x");
-      if (!main) throw new Error("preset chip not found");
+      const main = w.findAll('[data-testid="repo-row-pick"]').find((b) => b.text().includes("x"));
+      if (!main) throw new Error("repo row not found");
       await main.trigger("click"); // fillDir → immediate load + must cancel the pending /typed debounce
       await flushPromises();
       const afterClick = sessionCalls() - before;
@@ -419,16 +431,6 @@ describe("TerminalCell", () => {
     w.findComponent({ name: "TerminalView" }).vm.$emit("cwd", "/home/me/alpha");
     await flushPromises();
     expect(w.emitted("record-cwd")?.at(-1)).toEqual(["/home/me/alpha"]);
-  });
-
-  it("emits remove-preset (and does NOT launch) when a chip's ✕ is clicked", async () => {
-    const w = mountCell(null, { presets: [{ label: "proj", path: "/work/proj" }] });
-    await flushPromises();
-    const chip = w.findAll('[data-testid="cell-chip"]').find((c) => c.find('[data-testid="cell-chip-main"]').text() === "proj");
-    if (!chip) throw new Error("preset chip not found");
-    await chip.find('[data-testid="cell-chip-del"]').trigger("click");
-    expect(w.emitted("remove-preset")?.at(-1)).toEqual(["/work/proj"]);
-    expect(w.findComponent({ name: "TerminalView" }).exists()).toBe(false);
   });
 
   it("does NOT emit record-cwd when a restored session reports its cwd (only fresh launches)", async () => {
@@ -1705,24 +1707,27 @@ describe("TerminalCell", () => {
     expect(w.find(".cell").classes()).toContain("border-[var(--cell-border,var(--border))]");
   });
 
-  it("tints a preset chip whose dir already has a running session elsewhere", () => {
-    const w = mountCell(null, {
-      presets: [
-        { label: "proj-a", path: "/home/me/a" },
-        { label: "proj-b", path: "/home/me/b" },
+  it("tints a repo row whose dir already has a running session elsewhere", async () => {
+    mockFetch(
+      [],
+      [],
+      [
+        { name: "proj-a", path: "/home/me/a", git: true },
+        { name: "proj-b", path: "/home/me/b", git: true },
       ],
-      openCwds: ["/home/me/a"],
-    });
-    const chips = w.findAll('[data-testid="cell-chip"]');
-    const running = chips.find((c) => c.text().includes("proj-a"));
-    const idle = chips.find((c) => c.text().includes("proj-b"));
+    );
+    const w = mountCell(null, { openCwds: ["/home/me/a"] });
+    await flushPromises();
+    const rows = w.findAll('[data-testid="repo-row"]');
+    const running = rows.find((r) => r.text().includes("proj-a"));
+    const idle = rows.find((r) => r.text().includes("proj-b"));
     expect(running?.classes()).toContain("is-running");
-    expect(running?.find('[data-testid="cell-chip-dot"]').exists()).toBe(true);
+    expect(running?.find('[data-testid="repo-row-dot"]').exists()).toBe(true);
     // a11y: the running state is exposed in text (on the ▶ launch button — the action that
     // would actually double-launch there), not just color/hover.
-    expect(running?.find('[data-testid="cell-chip-launch"]').attributes("aria-label")).toContain("already running");
+    expect(running?.find('[data-testid="repo-row-launch"]').attributes("aria-label")).toContain("already running");
     expect(idle?.classes()).not.toContain("is-running");
-    expect(idle?.find('[data-testid="cell-chip-dot"]').exists()).toBe(false);
-    expect(idle?.find('[data-testid="cell-chip-launch"]').attributes("aria-label")).not.toContain("already running");
+    expect(idle?.find('[data-testid="repo-row-dot"]').exists()).toBe(false);
+    expect(idle?.find('[data-testid="repo-row-launch"]').attributes("aria-label")).not.toContain("already running");
   });
 });

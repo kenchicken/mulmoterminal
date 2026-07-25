@@ -15,6 +15,7 @@ import { headerStyleFor, cellStyleFor } from "./cellHeaderStyle";
 import GitBranchChip from "./GitBranchChip.vue";
 import ModelContextBadge from "./ModelContextBadge.vue";
 import ModelPicker from "./ModelPicker.vue";
+import RepoPicker from "./RepoPicker.vue";
 import type { LaunchChoice } from "./wsUrl";
 import type { RunCommand } from "./runCommand";
 import { useHeaderButtons } from "../composables/useHeaderButtons";
@@ -327,11 +328,11 @@ function launchProgram(index: number, l: Launcher) {
   emit("launch", { index, label: l.label, cwd: dirInput.value.trim() || props.defaultCwd });
 }
 
-// The chip's ▶ button: a one-click quick launch — fill the field and jump straight
+// The repo row's ▶: a one-click quick launch — fill the field and jump straight
 // into a fresh session in that dir.
-function selectPreset(p: CwdPreset) {
-  dirInput.value = p.path;
-  launchIn(p.path);
+function launchFromRepo(path: string) {
+  dirInput.value = path;
+  launchIn(path);
 }
 
 // A programmatic dir change (fillDir) loads the lists immediately, so the dirInput watch
@@ -1404,58 +1405,11 @@ onUnmounted(() => document.removeEventListener("keydown", onDiffKey));
       >
         ✕
       </button>
-      <div v-if="presets.length" class="flex max-w-[360px] flex-wrap justify-center gap-1.5">
-        <span
-          v-for="p in presets"
-          :key="p.label + p.path"
-          data-testid="cell-chip"
-          class="inline-flex items-stretch overflow-hidden rounded-[14px] border"
-          :class="[
-            { 'is-running': isCwdRunning(p.path) },
-            isCwdRunning(p.path)
-              ? 'border-[color-mix(in_srgb,#3b82f6_55%,var(--border))] bg-[color-mix(in_srgb,#3b82f6_14%,var(--bg-elevated))]'
-              : 'border-border bg-elevated',
-          ]"
-        >
-          <button
-            type="button"
-            data-testid="cell-chip-main"
-            class="cursor-pointer border-none bg-transparent px-2.5 py-1 font-sans text-[12px] hover:bg-hover hover:text-fg"
-            :class="isCwdRunning(p.path) ? 'text-fg' : 'text-secondary'"
-            :title="p.path"
-            :aria-label="`Use ${p.label} — fill the field to browse / resume here (without launching)`"
-            @click="fillDir(p.path)"
-          >
-            <span
-              v-if="isCwdRunning(p.path)"
-              data-testid="cell-chip-dot"
-              class="mr-[5px] inline-block h-1.5 w-1.5 rounded-full bg-[#3b82f6] align-middle"
-              aria-hidden="true"
-            />{{ p.label }}
-          </button>
-          <button
-            type="button"
-            data-testid="cell-chip-launch"
-            class="inline-flex cursor-pointer items-center border-0 border-l border-l-border bg-transparent px-[5px] text-secondary hover:bg-hover hover:text-fg"
-            :title="isCwdRunning(p.path) ? `${p.path} — a session is already running here in another terminal` : `Launch a new terminal in ${p.path} now`"
-            :aria-label="
-              isCwdRunning(p.path) ? `${p.label} — a session is already running here in another terminal` : `Launch a new terminal in ${p.label} now`
-            "
-            @click="selectPreset(p)"
-          >
-            <span class="material-symbols-outlined text-[14px]">play_arrow</span>
-          </button>
-          <button
-            type="button"
-            data-testid="cell-chip-del"
-            class="cursor-pointer border-0 border-l border-l-border bg-transparent px-[7px] text-[11px] text-secondary hover:bg-hover hover:text-[var(--danger,#e5484d)]"
-            :title="`Remove ${p.path} from the list`"
-            :aria-label="`Remove ${p.path} from the list`"
-            @click="emit('remove-preset', p.path)"
-          >
-            ✕
-          </button>
-        </span>
+      <!-- The repository chooser (baseDir listing) — the same list the chat view's
+           new-session modal offers. Row click fills the form (resume/model still
+           choosable); ▶ launches there immediately. -->
+      <div class="flex max-h-[220px] w-full max-w-[360px] flex-col">
+        <RepoPicker :is-running="isCwdRunning" @pick="fillDir" @launch="launchFromRepo" />
       </div>
       <div class="inline-flex gap-0.5 self-start rounded-[7px] border border-border bg-deep p-0.5" role="radiogroup" aria-label="Agent">
         <button
