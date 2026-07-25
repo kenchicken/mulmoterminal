@@ -6,6 +6,12 @@ import path from "node:path";
 
 export const PORT = process.env.PORT || 34567;
 
+// Optional bind address for the HTTP server. Unset binds every interface (the historical
+// behavior); operators who reach the server over a VPN (e.g. a Tailscale address) can pin
+// it so the socket never exists on their LAN at all — unlike the browser-only Origin
+// check, this also keeps non-browser clients (curl, websocat) out at the network level.
+export const HOST = process.env.MULMOTERMINAL_HOST || undefined;
+
 // The workspace used as the PTY cwd and as the root for persisted session state. index.ts
 // creates it at boot before anything spawns into it.
 export const CLAUDE_CWD = process.env.CLAUDE_CWD || path.join(os.homedir(), "mulmoclaude");

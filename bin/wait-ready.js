@@ -22,7 +22,8 @@ export function probeOnce(get, port, timeoutMs = PROBE_TIMEOUT_MS) {
       settled = true;
       resolve(outcome);
     };
-    const req = get({ host: "127.0.0.1", port, path: "/", timeout: timeoutMs }, (res) => {
+    // Probe the address the server actually binds (MULMOTERMINAL_HOST), else loopback.
+    const req = get({ host: process.env.MULMOTERMINAL_HOST || "127.0.0.1", port, path: "/", timeout: timeoutMs }, (res) => {
       res.resume();
       done("ready");
     });

@@ -23,7 +23,7 @@ import {
 import { sandboxEnabled, sandboxPlatformSupported, dockerAvailable, ensureSandboxImage } from "./infra/sandbox.js";
 import { isAllowedOrigin } from "./infra/allowed-origin.js";
 import { serverErrorExit } from "./infra/server-exit.js";
-import { PORT, CLAUDE_CWD, MULMOTERMINAL_HOME, SESSION_ID_RE } from "./config/env.js";
+import { PORT, HOST, CLAUDE_CWD, MULMOTERMINAL_HOME, SESSION_ID_RE } from "./config/env.js";
 import { messageOf } from "./errors.js";
 import { hookSettingsJson } from "./session/hook-settings.js";
 import { mcpConfigJson } from "./session/mcp-config.js";
@@ -497,8 +497,8 @@ server.on("error", (err) => {
   process.exit(code);
 });
 
-server.listen(PORT, () => {
-  console.log(`mulmoterminal running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`mulmoterminal running at http://${HOST || "localhost"}:${PORT}`);
   if (tmuxAvailable()) {
     const surviving = tmuxListSessionIds();
     const detail = surviving.length ? ` — ${surviving.length} session(s) survived; reattach on connect` : "";
