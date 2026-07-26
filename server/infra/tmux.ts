@@ -270,6 +270,21 @@ export function tmuxListSessionIds(): string[] {
     .map((n) => n.slice(SESSION_PREFIX.length));
 }
 
+// Survivors with the active pane's working directory, for /api/live-sessions: an
+// adopted grid cell needs the real cwd, or a later resume would fall back to the
+// server default and start somewhere unrelated.
+export function tmuxListSessions(): { id: string; cwd: string | null }[] {
+  const r = tmux(["list-sessions", "-F", "#{session_name}\t#{pane_current_path}"]);
+  if (r.status !== 0) return [];
+  return r.stdout
+    .split("\n")
+    .filter((l) => l.startsWith(SESSION_PREFIX))
+    .map((l) => {
+      const [name, cwd] = l.split("\t");
+      return { id: name.slice(SESSION_PREFIX.length), cwd: cwd || null };
+    });
+}
+
 // A tmux `mt-<id>` is resumable — an orphan cleanup must NOT reap it — when it's live
 // (an attached pty), a persisted grid session, or has a Claude/Codex transcript on disk.
 // Pure so the safe-cleanup rule ("never kill a resumable session") is unit-testable.

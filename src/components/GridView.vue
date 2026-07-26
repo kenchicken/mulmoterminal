@@ -24,6 +24,8 @@ import {
   moveCell,
   adoptSessions,
   hideCell,
+  removeCellsBySession,
+  type LiveSession,
   orderCells,
   pageSlice,
   activityStatus,
@@ -333,14 +335,34 @@ const onHide = (uid: number) =>
 // pops up here within a beat. adoptSessions returns the same object when nothing
 // changed, so the deep persist watcher isn't tickled by no-op refreshes.
 let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+// Cells are rendered only after the FIRST live fetch reconciles them: a persisted cell
+// whose session died must be removed BEFORE it mounts, because mounting connects, and
+// connecting with an unresumable id makes the server mint a fresh session in its default
+// cwd — the "every reload spawns a home-dir session" bug. On a fetch error the grid
+// renders as-is (server down beats a blank screen).
+const liveReady = ref(false);
+// Ids missing from ONE fetch: removed only when a second consecutive fetch also lacks
+// them, so a fetch racing a just-announced session can't tear down its cell.
+let missingLive = new Set<string>();
 async function refreshLiveSessions() {
   try {
     const res = await fetch("/api/live-sessions");
     if (!res.ok) return;
     const body = await res.json();
-    if (Array.isArray(body.sessions)) state.value = adoptSessions(state.value, body.sessions);
+    if (!Array.isArray(body.sessions)) return;
+    const live = body.sessions as LiveSession[];
+    const liveIds = new Set(live.map((l) => l.id));
+    const missing = state.value.cells.map((c) => c.session).filter((x): x is string => !!x && !liveIds.has(x));
+    // Before the first render nothing is connected yet, so prune in one strike.
+    const confirmed = liveReady.value ? missing.filter((id) => missingLive.has(id)) : missing;
+    if (confirmed.length) state.value = removeCellsBySession(state.value, confirmed);
+    missingLive = new Set(missing.filter((id) => !confirmed.includes(id)));
+    if (missingLive.size) scheduleLiveRefresh(); // the second strike
+    state.value = adoptSessions(state.value, live);
   } catch {
     // Offline / server restarting — the next push or activation retries.
+  } finally {
+    liveReady.value = true;
   }
 }
 function scheduleLiveRefresh() {
@@ -442,6 +464,7 @@ function configureAppearance() {
       </button>
     </nav>
     <TerminalGrid
+      v-if="liveReady"
       class="flex-1 min-h-0 min-w-0"
       :cells="displayCells"
       :expanded-uid="expandedUid"

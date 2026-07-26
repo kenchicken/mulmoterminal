@@ -34,7 +34,7 @@ import {
   type Cell,
   gridStatusSummary,
 } from "../../../src/components/gridTabs.js";
-import { adoptSessions, hideCell } from "../../../src/components/gridTabs.js";
+import { adoptSessions, hideCell, removeCellsBySession } from "../../../src/components/gridTabs.js";
 
 const U = (n: number) => `${String(n % 10).repeat(8)}-aaaa-aaaa-aaaa-aaaaaaaaaaaa`;
 const cell = (uid: number, session: string | null = null, cwd: string | null = null): Cell => ({ uid, session, cwd });
@@ -626,5 +626,25 @@ describe("adoptSessions / hideCell (live-session mirroring)", () => {
     expect(parseGridState(persisted)?.hiddenIds).toEqual([U(4)]);
     const junk = JSON.stringify({ cells: [{ uid: 0, session: U(1), cwd: null }], hiddenIds: ["nope", 5, U(2)] });
     expect(parseGridState(junk)?.hiddenIds).toEqual([U(2)]);
+  });
+});
+
+describe("removeCellsBySession", () => {
+  it("drops the named sessions' cells and leaves the rest", () => {
+    const s0 = make(running(3));
+    const s1 = removeCellsBySession(s0, [U(1)]);
+    expect(s1.cells.filter((c) => c.session).map((c) => c.session)).toEqual([U(0), U(2)]);
+  });
+
+  it("returns the SAME state when nothing matches (persist on identity)", () => {
+    const s0 = make(running(2));
+    expect(removeCellsBySession(s0, [U(9)])).toBe(s0);
+    expect(removeCellsBySession(s0, [])).toBe(s0);
+  });
+
+  it("collapses the zoom when the zoomed cell's session is removed", () => {
+    const s0 = make(running(3), { expanded: 1 });
+    expect(removeCellsBySession(s0, [U(1)]).expanded).toBeNull();
+    expect(removeCellsBySession(s0, [U(2)]).expanded).toBe(1);
   });
 });

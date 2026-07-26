@@ -179,6 +179,19 @@ export interface LiveSession {
   agent?: "codex";
 }
 
+// Drop the cells of sessions that no longer exist server-side. The grid mirrors live
+// sessions, so a dead session's cell must go — left in place it would "resume" on the
+// next mount, which mints a FRESH session in the server's default cwd (the reload-spawns-
+// a-home-session bug). Returns the same object when nothing matched.
+export function removeCellsBySession(state: GridState, ids: readonly string[]): GridState {
+  if (ids.length === 0) return state;
+  const drop = new Set(ids);
+  const cells = state.cells.filter((c) => !c.session || !drop.has(c.session));
+  if (cells.length === state.cells.length) return state;
+  const expanded = state.expanded !== null && cells.some((c) => c.uid === state.expanded) ? state.expanded : null;
+  return ensureEntry(clampPage({ ...state, cells, expanded }));
+}
+
 // Mirror the server's live-session roster into the grid: a cell appears for every live
 // session not already shown and not user-hidden, so a chat-started session shows up here
 // too. Also prunes hiddenIds to ids still alive (a hide must not outlive its session).

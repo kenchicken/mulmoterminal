@@ -38,7 +38,7 @@ import { listCodexSessions } from "../agents/codex-sessions.js";
 import type { SessionMeta } from "../session/types.js";
 import { parseActivityIds, selectSessionRows } from "../session/session-list.js";
 import { sessionDetailView } from "../session/session-detail-view.js";
-import { tmuxAvailable, tmuxListSessionIds } from "../infra/tmux.js";
+import { tmuxAvailable, tmuxListSessions } from "../infra/tmux.js";
 
 // Only the most-recent N sessions are listed in the sidebar; older ones aren't
 // read or parsed, keeping /api/sessions cheap for projects with many sessions.
@@ -204,9 +204,9 @@ export function mountSessionRoutes(app: Express, deps: SessionRouteDeps): void {
     }
     if (tmuxAvailable()) {
       const attached = new Set(sessions.map((s) => s.id));
-      for (const id of tmuxListSessionIds()) {
+      for (const { id, cwd } of tmuxListSessions()) {
         if (!SESSION_ID_RE.test(id) || attached.has(id) || internal(id)) continue;
-        sessions.push({ id, cwd: null });
+        sessions.push({ id, cwd });
       }
     }
     res.json({ sessions });
