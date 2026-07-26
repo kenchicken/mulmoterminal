@@ -6,7 +6,7 @@ import NotificationBell from "./NotificationBell.vue";
 import RemoteHostControl from "./RemoteHostControl.vue";
 import LauncherButton from "./LauncherButton.vue";
 import { useShortcuts } from "../composables/useShortcuts";
-import { useCollectionBrowse, browseGotoIndex, browseGotoDetail } from "../composables/useCollectionBrowse";
+import { useCollectionBrowse, browseGotoDetail } from "../composables/useCollectionBrowse";
 import { useWikiBrowse, wikiGotoIndex, wikiGotoTag } from "../composables/useWikiBrowse";
 import { usePrsView, prsGotoIndex } from "../composables/usePrsView";
 import { useSoundEnabled } from "../composables/useSoundEnabled";
@@ -71,7 +71,6 @@ async function copyUpdateCommand(): Promise<void> {
 }
 
 const inGrid = computed(() => route.name === "terminals");
-const collectionsActive = computed(() => browseView.value.mode === "index" && browseView.value.kind === "collection");
 const wikiActive = computed(() => wikiOpen.value);
 const prsActive = computed(() => prsOpen.value);
 function favActive(s: Shortcut): boolean {
@@ -80,9 +79,6 @@ function favActive(s: Shortcut): boolean {
 
 function showGrid(): void {
   router.push("/terminals");
-}
-function showCollections(): void {
-  browseGotoIndex("collection");
 }
 function showFavorite(s: Shortcut): void {
   browseGotoDetail(s.kind, s.slug);
@@ -107,7 +103,6 @@ function showPrs(): void {
     <span class="font-sans text-[14px] font-semibold tracking-[0.02em] text-fg">MulmoTerminal</span>
     <nav class="ml-4 flex min-w-0 items-center gap-[3px] overflow-x-auto" aria-label="Views">
       <LauncherButton icon="grid_view" title="Grid (multiple terminals)" label="Grid view" :active="inGrid" @click="showGrid" />
-      <LauncherButton icon="apps" title="Collections" label="Collections" :active="collectionsActive" @click="showCollections" />
       <LauncherButton icon="call_merge" title="Pull requests" label="Pull requests" :active="prsActive" @click="showPrs" />
       <LauncherButton icon="menu_book" title="Wiki" label="Wiki" :active="wikiActive" @click="showWiki" />
       <LauncherButton
