@@ -200,7 +200,11 @@ export const tmuxSessionName = (id: string): string => `${SESSION_PREFIX}${id}`;
 // primitive covers both first launch and reattach-after-restart. Returned as the args
 // for pty.spawn("tmux", ...).
 export function tmuxNewSessionArgs(id: string, file: string, args: string[], cwd: string): string[] {
-  return ["-L", SERVER_SOCKET, "-f", CONF_FILE, "new-session", "-A", "-s", tmuxSessionName(id), "-c", cwd, "--", file, ...args];
+  // -u forces the CLIENT side to emit UTF-8. Under launchd there is no LANG in the
+  // environment, so tmux decides the attached terminal can't show non-ASCII and
+  // substitutes every such cell with "_" — Claude's ⚠/⎿/⏵/❯ glyphs all became
+  // underscores in the browser. The pane content itself was always parsed fine.
+  return ["-u", "-L", SERVER_SOCKET, "-f", CONF_FILE, "new-session", "-A", "-s", tmuxSessionName(id), "-c", cwd, "--", file, ...args];
 }
 
 // Is a persistent session for this id currently alive in our tmux server?

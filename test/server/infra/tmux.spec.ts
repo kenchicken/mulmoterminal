@@ -19,8 +19,10 @@ describe("tmuxSessionName", () => {
 describe("tmuxNewSessionArgs", () => {
   const args = tmuxNewSessionArgs("id1", "/bin/zsh", ["-lc", "exec codex"], "/proj");
 
-  it("targets our isolated tmux server and config", () => {
-    expect(args.slice(0, 4)).toEqual(["-L", "mulmoterminal", "-f", expect.stringMatching(/tmux\.conf$/)]);
+  it("targets our isolated tmux server and config, forcing a UTF-8 client", () => {
+    // -u first: launchd provides no LANG, and without it tmux renders every
+    // non-ASCII cell as "_" for this client.
+    expect(args.slice(0, 5)).toEqual(["-u", "-L", "mulmoterminal", "-f", expect.stringMatching(/tmux\.conf$/)]);
   });
   it("uses new-session -A (create-or-attach) with the mt- session name and cwd", () => {
     expect(args).toContain("new-session");
