@@ -30,6 +30,7 @@ import { mountCostRoute } from "../session/cost.js";
 import { mountCollectionRoutes } from "../backends/collections.js";
 import { mountGoogleRoutes } from "../backends/google.js";
 import { mountWikiRoutes } from "../backends/wiki.js";
+import { mountExternalWikiRoutes } from "../backends/wiki-external.js";
 import { mountAccountingRoutes } from "../backends/accounting.js";
 import { mountFeedsRoutes } from "../backends/feeds.js";
 import { mountRemoteHostRoutes } from "../backends/remoteHost/index.js";
@@ -113,7 +114,11 @@ export function mountAppRoutes(app: Express, deps: AppRouteDeps): void {
   // workspace, thin consumers of @mulmoclaude/core/wiki/server. Claude authors the wiki
   // via the real CLI in the terminal; MT's overlay only browses. Mounted before the /api
   // SPA fallback.
-  mountWikiRoutes(app, { workspace: CLAUDE_CWD });
+  // MULMOTERMINAL_WIKI_ROOT points the wiki surface at an external knowledge-base
+  // clone (read-only, flattened slugs) instead of the workspace's data/wiki.
+  const externalWikiRoot = process.env.MULMOTERMINAL_WIKI_ROOT;
+  if (externalWikiRoot) mountExternalWikiRoutes(app, { root: externalWikiRoot });
+  else mountWikiRoutes(app, { workspace: CLAUDE_CWD });
 
   // Accounting dispatch route (POST /api/accounting) from @mulmoclaude/accounting-plugin.
   // Drives BOTH the AccountingView (configureAccountingHost.apiCall) and the

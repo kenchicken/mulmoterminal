@@ -497,7 +497,7 @@ server.on("error", (err) => {
   process.exit(code);
 });
 
-server.listen(PORT, HOST, () => {
+server.listen(Number(PORT), HOST, () => {
   console.log(`mulmoterminal running at http://${HOST || "localhost"}:${PORT}`);
   if (tmuxAvailable()) {
     const surviving = tmuxListSessionIds();
