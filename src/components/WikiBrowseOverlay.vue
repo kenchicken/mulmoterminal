@@ -149,7 +149,7 @@ useEscapeToClose(isOpen, close);
       <p v-if="error" class="px-7 py-12 text-center text-err">{{ error }}</p>
       <p v-else-if="loading" class="px-7 py-12 text-center text-muted">Loading…</p>
       <template v-else>
-        <WikiIndexView v-if="view.mode === 'index' && index" :entries="index.entries" />
+        <WikiIndexView v-if="view.mode === 'index' && index" :entries="index.entries" :index-content="index.content" />
         <WikiPageView v-else-if="view.mode === 'page' && page" :slug="view.slug" :page="page" :graph="graph" />
         <WikiGraphView v-else-if="view.mode === 'graph' && graph" :graph="graph" />
         <!-- eslint-disable-next-line vue/no-v-html -- sanitized in renderWikiHtml -->

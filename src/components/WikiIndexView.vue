@@ -8,8 +8,9 @@ import type { WikiPageEntry } from "@mulmoclaude/core/wiki";
 import FilterChip from "./FilterChip.vue";
 import { wikiGotoPage } from "../composables/useWikiBrowse";
 import { filterChips, filterEntriesByTags, parseTagQuery } from "./wikiTagFilter";
+import { groupEntriesBySection } from "./wikiIndexSections";
 
-const props = defineProps<{ entries: WikiPageEntry[] }>();
+const props = defineProps<{ entries: WikiPageEntry[]; indexContent?: string }>();
 
 const route = useRoute();
 // Pre-select tags named by `?tag=` (the Worklog header shortcut opens `/wiki?tag=worklog`).
@@ -25,6 +26,10 @@ watch(
 
 const visibleTags = computed(() => filterChips(props.entries, selected.value));
 const filtered = computed(() => filterEntriesByTags(props.entries, selected.value));
+// The index.md section headings become the display hierarchy (llm-wiki style indexes);
+// with no content or no headings everything lands in one heading-less group — the
+// original flat grid.
+const sections = computed(() => groupEntriesBySection(props.indexContent ?? "", filtered.value));
 
 function toggleTag(tag: string): void {
   const next = new Set(selected.value);
@@ -40,8 +45,16 @@ function toggleTag(tag: string): void {
       <FilterChip v-for="[tag, count] in visibleTags" :key="tag" :label="`#${tag}`" :count="count" :active="selected.has(tag)" @click="toggleTag(tag)" />
     </div>
     <p v-if="!entries.length" class="py-12 px-7 text-center text-muted">The wiki is empty.</p>
-    <ul v-else class="list-none m-0 p-0 grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-      <li v-for="entry in filtered" :key="entry.slug">
+    <section v-for="group in sections" v-else :key="group.heading ?? ''" class="mb-7">
+      <h2
+        v-if="group.heading"
+        data-testid="wiki-section-heading"
+        class="m-0 mb-3 border-b border-b-border pb-1.5 font-sans text-[15px] font-[650] text-fg"
+      >
+        {{ group.heading }}
+      </h2>
+      <ul class="list-none m-0 p-0 grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
+      <li v-for="entry in group.entries" :key="entry.slug">
         <!-- A div (not button) so the per-tag filter chips can be real buttons. -->
         <div
           class="flex flex-col gap-1.5 w-full h-full text-left py-3.5 px-4 bg-panel border border-border rounded-[10px] cursor-pointer hover:border-accent"
@@ -67,6 +80,7 @@ function toggleTag(tag: string): void {
           </span>
         </div>
       </li>
-    </ul>
+      </ul>
+    </section>
   </div>
 </template>
