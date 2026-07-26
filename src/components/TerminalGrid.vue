@@ -57,7 +57,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   (e: "session" | "cwd", uid: number, value: string): void;
-  (e: "close" | "toggle-expand", uid: number): void;
+  (e: "close" | "hide" | "toggle-expand", uid: number): void;
   (e: "run" | "runSpare", uid: number, command: RunCommand): void;
   (e: "launch", uid: number, pick: LaunchPick): void;
   (e: "move", uid: number, dir: -1 | 1): void;
@@ -237,6 +237,7 @@ watch(
           :reorderable="reorderable"
           @toggle-expand="emit('toggle-expand', cell.uid)"
           @close="emit('close', cell.uid)"
+          @hide="emit('hide', cell.uid)"
           @move="(dir) => emit('move', cell.uid, dir)"
           @status="(s) => emit('status', cell.uid, s)"
         />
@@ -254,6 +255,7 @@ watch(
           :reorderable="reorderable"
           @toggle-expand="emit('toggle-expand', cell.uid)"
           @close="emit('close', cell.uid)"
+          @hide="emit('hide', cell.uid)"
           @move="(dir) => emit('move', cell.uid, dir)"
           @status="(s) => emit('status', cell.uid, s)"
           @session="(id) => emit('session', cell.uid, id)"
@@ -286,6 +288,7 @@ watch(
           @run-spare="(cmd) => emit('runSpare', cell.uid, cmd)"
           @launch="(pick) => emit('launch', cell.uid, pick)"
           @close="emit('close', cell.uid)"
+          @hide="emit('hide', cell.uid)"
           @move="(dir) => emit('move', cell.uid, dir)"
           @status="(s) => emit('status', cell.uid, s)"
         />

@@ -18,7 +18,9 @@ export interface GridCellProps {
 }
 
 export interface GridCellEmits {
-  (e: "toggle-expand" | "close"): void;
+  // `hide`: remove the cell from the grid WITHOUT ending the session (the − button).
+  // `close` after a ✕ teardown means the session was terminated and the cell reset.
+  (e: "toggle-expand" | "close" | "hide"): void;
   // Swap this cell left (-1) or right (+1) in manual sort mode.
   (e: "move", dir: -1 | 1): void;
   // Report activity up so the grid can attention-sort in auto mode.

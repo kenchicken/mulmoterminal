@@ -22,6 +22,8 @@ import {
   launchInCell,
   setSortMode,
   moveCell,
+  adoptSessions,
+  hideCell,
   orderCells,
   pageSlice,
   activityStatus,
@@ -319,6 +321,40 @@ const onClose = (uid: number) =>
     uid,
     displayCells.value.map((c) => c.uid),
   ));
+const onHide = (uid: number) =>
+  (state.value = hideCell(
+    state.value,
+    uid,
+    displayCells.value.map((c) => c.uid),
+  ));
+
+// Mirror the server's live sessions into the grid (auto-adopt): fetched on entry and
+// re-fetched on every "sessions" pub/sub push, so a session started in the chat view
+// pops up here within a beat. adoptSessions returns the same object when nothing
+// changed, so the deep persist watcher isn't tickled by no-op refreshes.
+let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+async function refreshLiveSessions() {
+  try {
+    const res = await fetch("/api/live-sessions");
+    if (!res.ok) return;
+    const body = await res.json();
+    if (Array.isArray(body.sessions)) state.value = adoptSessions(state.value, body.sessions);
+  } catch {
+    // Offline / server restarting — the next push or activation retries.
+  }
+}
+function scheduleLiveRefresh() {
+  if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+  // Small debounce: a burst of session events (e.g. several launches) is one refetch.
+  liveRefreshTimer = setTimeout(() => void refreshLiveSessions(), 300);
+}
+const unsubscribeLiveSessions = usePubSub().subscribe("sessions", scheduleLiveRefresh);
+onBeforeUnmount(() => {
+  unsubscribeLiveSessions();
+  if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+});
+onMounted(() => void refreshLiveSessions());
+onActivated(() => void refreshLiveSessions());
 const onToggleExpand = (uid: number) => (state.value = toggleExpand(state.value, uid));
 const onRun = (uid: number, command: RunCommand) => (state.value = runCommand(state.value, uid, command));
 // A running cell's header Run menu: launch in a spare cell (next to it) so the session survives.
@@ -425,6 +461,7 @@ function configureAppearance() {
       @record-cwd="recordPreset"
       @remove-preset="removePreset"
       @close="onClose"
+      @hide="onHide"
       @toggle-expand="onToggleExpand"
       @run="onRun"
       @run-spare="onRunSpare"

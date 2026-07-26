@@ -14,10 +14,13 @@ import {
   activity,
   activityStateHydrated,
   aiTitles,
+  codexRolloutIds,
   devTerminalSessions,
   devTerminalSessionsHydrated,
+  hiddenSessions,
   lastPrompts,
   lastResponses,
+  ptys,
   translationWorkerIds,
 } from "../session/registry.js";
 import {
@@ -35,6 +38,7 @@ import { listCodexSessions } from "../agents/codex-sessions.js";
 import type { SessionMeta } from "../session/types.js";
 import { parseActivityIds, selectSessionRows } from "../session/session-list.js";
 import { sessionDetailView } from "../session/session-detail-view.js";
+import { tmuxAvailable, tmuxListSessionIds } from "../infra/tmux.js";
 
 // Only the most-recent N sessions are listed in the sidebar; older ones aren't
 // read or parsed, keeping /api/sessions cheap for projects with many sessions.
@@ -186,6 +190,28 @@ export function mountSessionRoutes(app: Express, deps: SessionRouteDeps): void {
   app.get("/api/activity", activitySnapshot);
   app.get("/api/transcript/timeline", toolTimeline);
   app.get("/api/transcript/last-turn", lastTurn);
+  // Every session with a live process, regardless of which view or directory started
+  // it: the attached/backgrounded ptys of THIS server, plus tmux survivors of a previous
+  // one (cwd/agent unknown until reattach). Internal helpers (hidden background workers,
+  // translation workers) are excluded. The grid's auto-adopt reads this to show a cell
+  // for each live session, so a chat-started session appears in the grid too.
+  app.get("/api/live-sessions", (_req: Request, res: Response) => {
+    const internal = (id: string) => hiddenSessions.has(id) || translationWorkerIds.has(id);
+    const sessions: { id: string; cwd: string | null; agent?: "codex" }[] = [];
+    for (const [id, entry] of ptys) {
+      if (internal(id)) continue;
+      sessions.push({ id, cwd: entry.cwd ?? null, agent: codexRolloutIds.has(id) ? "codex" : undefined });
+    }
+    if (tmuxAvailable()) {
+      const attached = new Set(sessions.map((s) => s.id));
+      for (const id of tmuxListSessionIds()) {
+        if (!SESSION_ID_RE.test(id) || attached.has(id) || internal(id)) continue;
+        sessions.push({ id, cwd: null });
+      }
+    }
+    res.json({ sessions });
+  });
+
   app.get("/api/sessions", sessionList);
   app.get("/api/codex/sessions", codexSessionList);
 }

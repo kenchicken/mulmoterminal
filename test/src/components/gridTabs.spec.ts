@@ -34,6 +34,7 @@ import {
   type Cell,
   gridStatusSummary,
 } from "../../../src/components/gridTabs.js";
+import { adoptSessions, hideCell } from "../../../src/components/gridTabs.js";
 
 const U = (n: number) => `${String(n % 10).repeat(8)}-aaaa-aaaa-aaaa-aaaaaaaaaaaa`;
 const cell = (uid: number, session: string | null = null, cwd: string | null = null): Cell => ({ uid, session, cwd });
@@ -44,6 +45,7 @@ const make = (cells: Cell[], extra: Partial<GridState> = {}): GridState => ({
   page: 0,
   nextUid: cells.length,
   sortMode: "manual",
+  hiddenIds: [],
   ...extra,
 });
 
@@ -574,5 +576,55 @@ describe("gridStatusSummary", () => {
 
   it("omits a zero count from the title", () => {
     expect(gridStatusSummary(counts({ blocked: 2, working: 1 })).title).toBe("2 need input · 1 working");
+  });
+});
+
+describe("adoptSessions / hideCell (live-session mirroring)", () => {
+  const live = (n: number, cwd: string | null = "/p") => ({ id: U(n), cwd });
+
+  it("adds a cell for a live session the grid doesn't show", () => {
+    const s0 = make(running(1));
+    const s1 = adoptSessions(s0, [live(0), live(1), live(7)]);
+    expect(s1.cells.filter((c) => c.session).map((c) => c.session)).toEqual([U(0), U(1), U(7)]);
+    expect(s1.cells.find((c) => c.session === U(7))?.cwd).toBe("/p");
+  });
+
+  it("keeps a trailing launch cell trailing when adopting", () => {
+    const s0 = make([cell(0, U(0)), cell(1, null)]);
+    const s1 = adoptSessions(s0, [live(0), live(5)]);
+    expect(s1.cells[s1.cells.length - 1].session).toBeNull();
+    expect(s1.cells.some((c) => c.session === U(5))).toBe(true);
+  });
+
+  it("returns the SAME state object when nothing changed (persist on identity)", () => {
+    const s0 = make(running(2));
+    expect(adoptSessions(s0, [live(0), live(1)])).toBe(s0);
+  });
+
+  it("hideCell removes the cell but remembers the session so adopt skips it", () => {
+    const s0 = make(running(2));
+    const s1 = hideCell(s0, 0);
+    expect(s1.cells.some((c) => c.session === U(0))).toBe(false);
+    expect(s1.hiddenIds).toEqual([U(0)]);
+    const s2 = adoptSessions(s1, [live(0), live(1)]);
+    expect(s2.cells.some((c) => c.session === U(0))).toBe(false);
+  });
+
+  it("prunes a hidden id once its session is no longer live", () => {
+    const s0 = make(running(2), { hiddenIds: [U(9)] });
+    const s1 = adoptSessions(s0, [live(0), live(1)]);
+    expect(s1.hiddenIds).toEqual([]);
+  });
+
+  it("adopts codex sessions with their agent", () => {
+    const s1 = adoptSessions(make([]), [{ id: U(3), cwd: "/x", agent: "codex" as const }]);
+    expect(s1.cells.find((c) => c.session === U(3))?.agent).toBe("codex");
+  });
+
+  it("round-trips hiddenIds through parse/persist and drops junk", () => {
+    const persisted = JSON.stringify({ ...make(running(1), { hiddenIds: [U(4)] }) });
+    expect(parseGridState(persisted)?.hiddenIds).toEqual([U(4)]);
+    const junk = JSON.stringify({ cells: [{ uid: 0, session: U(1), cwd: null }], hiddenIds: ["nope", 5, U(2)] });
+    expect(parseGridState(junk)?.hiddenIds).toEqual([U(2)]);
   });
 });

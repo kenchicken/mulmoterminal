@@ -53,6 +53,9 @@ export interface GridState {
   page: number;
   nextUid: number;
   sortMode: SortMode;
+  // Live sessions the user hid from the grid (the − button): auto-adopt skips these.
+  // Pruned against the live list on every adopt so dead ids don't accumulate.
+  hiddenIds: string[];
 }
 
 export const PAGE_SIZE = 9;
@@ -158,6 +161,45 @@ export function closeCell(state: GridState, uid: number, order?: number[]): Grid
   const cells = state.cells.filter((c) => c.uid !== uid);
   const expanded = state.expanded === uid ? expandNeighbour(order, uid, cells) : state.expanded;
   return ensureEntry(clampPage({ ...state, cells, expanded }));
+}
+
+// The − button: remove the cell from the grid WITHOUT ending its session, and remember
+// the session id so auto-adopt doesn't put it straight back. Contrast the ✕ path, which
+// terminates the session (the cell then resets itself and emits a plain close).
+export function hideCell(state: GridState, uid: number, order?: number[]): GridState {
+  const session = state.cells.find((c) => c.uid === uid)?.session;
+  const hiddenIds = session && !state.hiddenIds.includes(session) ? [...state.hiddenIds, session] : state.hiddenIds;
+  return closeCell({ ...state, hiddenIds }, uid, order);
+}
+
+// One live session as /api/live-sessions reports it.
+export interface LiveSession {
+  id: string;
+  cwd: string | null;
+  agent?: "codex";
+}
+
+// Mirror the server's live-session roster into the grid: a cell appears for every live
+// session not already shown and not user-hidden, so a chat-started session shows up here
+// too. Also prunes hiddenIds to ids still alive (a hide must not outlive its session).
+// Returns the SAME state object when nothing changed, so callers can persist on identity.
+export function adoptSessions(state: GridState, live: LiveSession[]): GridState {
+  const liveIds = new Set(live.map((l) => l.id));
+  const hiddenIds = state.hiddenIds.filter((id) => liveIds.has(id));
+  const shown = new Set(state.cells.map((c) => c.session).filter((x): x is string => !!x));
+  const hidden = new Set(hiddenIds);
+  const fresh = live.filter((l) => !shown.has(l.id) && !hidden.has(l.id));
+  if (fresh.length === 0 && hiddenIds.length === state.hiddenIds.length) return state;
+  // Keep a trailing launch cell trailing — adopted cells slot in before it.
+  const trailing = isLaunchCell(state.cells[state.cells.length - 1]) ? state.cells[state.cells.length - 1] : null;
+  const body = trailing ? state.cells.slice(0, -1) : [...state.cells];
+  let nextUid = state.nextUid;
+  for (const l of fresh) {
+    if (runningCount(body) >= MAX_TERMINALS) break;
+    body.push({ uid: nextUid++, session: l.id, cwd: l.cwd, agent: l.agent === "codex" ? "codex" : undefined });
+  }
+  const cells = trailing ? [...body, trailing] : body;
+  return clampPage(ensureEntry({ ...state, cells, nextUid, hiddenIds }));
 }
 
 // The uid to keep zoomed after closing the zoomed `uid`: the cell before it in the
@@ -308,7 +350,10 @@ export function parseGridState(raw: string | null): GridState | null {
     const expandedIdx = running.findIndex((c: Cell) => c.uid === parsed.expanded);
     const expanded = typeof parsed.expanded === "number" && expandedIdx >= 0 ? expandedIdx : null;
     const page = Number.isSafeInteger(parsed.page) && parsed.page >= 0 ? parsed.page : 0;
-    return clampPage(ensureEntry({ cells, expanded, page, nextUid: cells.length, sortMode: asSortMode(parsed.sortMode) }));
+    const hiddenIds = Array.isArray(parsed.hiddenIds)
+      ? parsed.hiddenIds.filter((x: unknown): x is string => typeof x === "string" && UUID_RE.test(x)).slice(0, 500)
+      : [];
+    return clampPage(ensureEntry({ cells, expanded, page, nextUid: cells.length, sortMode: asSortMode(parsed.sortMode), hiddenIds }));
   } catch {
     return null;
   }
@@ -324,7 +369,7 @@ export function migrateLegacy(raw: string | null): GridState | null {
       if (isUuid(s)) cells.push({ uid: cells.length, session: s, cwd: typeof parsed.cwds?.[i] === "string" ? parsed.cwds[i] : null });
     });
     const expanded = typeof parsed.expanded === "number" && parsed.expanded >= 0 && parsed.expanded < cells.length ? cells[parsed.expanded].uid : null;
-    return clampPage(ensureEntry({ cells, expanded, page: 0, nextUid: cells.length, sortMode: "manual" }));
+    return clampPage(ensureEntry({ cells, expanded, page: 0, nextUid: cells.length, sortMode: "manual", hiddenIds: [] }));
   } catch {
     return null;
   }
@@ -335,7 +380,7 @@ export function initialState(curRaw: string | null, legacyRaw: string | null): {
   if (cur) return { state: cur, migrated: false };
   const migrated = migrateLegacy(legacyRaw);
   if (migrated) return { state: migrated, migrated: true };
-  return { state: ensureEntry({ cells: [], expanded: null, page: 0, nextUid: 0, sortMode: "manual" }), migrated: false };
+  return { state: ensureEntry({ cells: [], expanded: null, page: 0, nextUid: 0, sortMode: "manual", hiddenIds: [] }), migrated: false };
 }
 
 // Which status a cell sorts and tallies by.

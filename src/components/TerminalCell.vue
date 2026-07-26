@@ -1020,7 +1020,18 @@ onUnmounted(() => document.removeEventListener("keydown", onDiffKey));
           >
             {{ expanded ? "⤡" : "⤢" }}
           </button>
-          <button class="cell-btn cell-close" :class="CELL_CLOSE_BTN" title="Close terminal" aria-label="Close terminal" @click.stop="close">✕</button>
+          <button
+            v-if="sessionId"
+            class="cell-btn"
+            :class="CELL_BTN"
+            title="Hide from grid — the session keeps running"
+            aria-label="Hide from grid without ending the session"
+            data-testid="cell-hide"
+            @click.stop="emit('hide')"
+          >
+            <span class="material-symbols-outlined text-[14px]">visibility_off</span>
+          </button>
+          <button class="cell-btn cell-close" :class="CELL_CLOSE_BTN" title="End session" aria-label="End the session and close the terminal" @click.stop="close">✕</button>
         </span>
       </CockpitHeader>
       <!-- Row 1 — INFO only (normal grid / expanded): dir + git + model/token + what it's doing.
@@ -1117,7 +1128,18 @@ onUnmounted(() => document.removeEventListener("keydown", onDiffKey));
           >
             {{ expanded ? "⤡" : "⤢" }}
           </button>
-          <button class="cell-btn cell-close" :class="CELL_CLOSE_BTN" title="Close terminal" aria-label="Close terminal" @click.stop="close">✕</button>
+          <button
+            v-if="sessionId"
+            class="cell-btn"
+            :class="CELL_BTN"
+            title="Hide from grid — the session keeps running"
+            aria-label="Hide from grid without ending the session"
+            data-testid="cell-hide"
+            @click.stop="emit('hide')"
+          >
+            <span class="material-symbols-outlined text-[14px]">visibility_off</span>
+          </button>
+          <button class="cell-btn cell-close" :class="CELL_CLOSE_BTN" title="End session" aria-label="End the session and close the terminal" @click.stop="close">✕</button>
         </span>
       </div>
       <TimelineOverlay :session-id="sessionId" :cwd="cwd" :open="timelineOpen" @close="timelineOpen = false" />
