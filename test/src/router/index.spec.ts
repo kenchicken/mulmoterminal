@@ -4,7 +4,7 @@ import { router, routes } from "../../../src/router/index";
 
 describe("router route table", () => {
   it("resolves the top-level surfaces to their names", () => {
-    expect(router.resolve("/").name).toBe("chat");
+    expect(router.resolve("/chat").name).toBe("chat");
     expect(router.resolve("/terminals").name).toBe("terminals");
     expect(router.resolve("/collections").name).toBe("collections");
     expect(router.resolve("/feeds").name).toBe("feeds");
@@ -21,12 +21,14 @@ describe("router route table", () => {
     expect(f.params.slug).toBe("tech-news");
   });
 
-  it("redirects unknown paths to chat (/)", async () => {
+  it("redirects / and unknown paths to the grid (/terminals)", async () => {
     // Use an isolated memory-history router so navigation (which follows redirects)
     // doesn't touch the shared singleton / jsdom history.
     const mem = createRouter({ history: createMemoryHistory(), routes });
+    await mem.push("/");
+    expect(mem.currentRoute.value.name).toBe("terminals");
     await mem.push("/this/does/not/exist");
-    expect(mem.currentRoute.value.name).toBe("chat");
-    expect(mem.currentRoute.value.path).toBe("/");
+    expect(mem.currentRoute.value.name).toBe("terminals");
+    expect(mem.currentRoute.value.path).toBe("/terminals");
   });
 });

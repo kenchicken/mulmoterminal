@@ -408,7 +408,7 @@ function closeSettings() {
 // (the grid has no single active session). The skill then asks which directory / batch.
 function configureAppearance() {
   closeSettings();
-  router.push("/");
+  router.push("/chat");
   void startCollectionChat("/mulmoterminal-config");
 }
 </script>

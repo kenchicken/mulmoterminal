@@ -71,8 +71,6 @@ async function copyUpdateCommand(): Promise<void> {
 }
 
 const inGrid = computed(() => route.name === "terminals");
-const inSingle = computed(() => !inGrid.value);
-const chatActive = computed(() => inSingle.value && browseView.value.mode === "closed" && !wikiOpen.value && !prsOpen.value);
 const collectionsActive = computed(() => browseView.value.mode === "index" && browseView.value.kind === "collection");
 const wikiActive = computed(() => wikiOpen.value);
 const prsActive = computed(() => prsOpen.value);
@@ -80,9 +78,6 @@ function favActive(s: Shortcut): boolean {
   return browseView.value.mode === "detail" && browseView.value.kind === s.kind && browseView.value.slug === s.slug;
 }
 
-function showChat(): void {
-  router.push("/");
-}
 function showGrid(): void {
   router.push("/terminals");
 }
@@ -111,7 +106,6 @@ function showPrs(): void {
   <header class="flex h-10 flex-none items-center border-b border-border bg-panel px-4">
     <span class="font-sans text-[14px] font-semibold tracking-[0.02em] text-fg">MulmoTerminal</span>
     <nav class="ml-4 flex min-w-0 items-center gap-[3px] overflow-x-auto" aria-label="Views">
-      <LauncherButton icon="chat" title="Chat" label="Chat" :active="chatActive" @click="showChat" />
       <LauncherButton icon="grid_view" title="Grid (multiple terminals)" label="Grid view" :active="inGrid" @click="showGrid" />
       <LauncherButton icon="apps" title="Collections" label="Collections" :active="collectionsActive" @click="showCollections" />
       <LauncherButton icon="call_merge" title="Pull requests" label="Pull requests" :active="prsActive" @click="showPrs" />

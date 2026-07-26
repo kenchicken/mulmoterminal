@@ -13,7 +13,10 @@ import { defineComponent } from "vue";
 const Stub = defineComponent({ name: "RouteStub", render: () => null });
 
 export const routes: RouteRecordRaw[] = [
-  { path: "/", name: "chat", component: Stub },
+  // The grid is home. The chat (single) view keeps a route for programmatic flows
+  // (collection chats), but has no toolbar button — kenchicken works grid-first.
+  { path: "/", redirect: "/terminals" },
+  { path: "/chat", name: "chat", component: Stub },
   { path: "/terminals", name: "terminals", component: Stub },
   { path: "/collections", name: "collections", component: Stub },
   { path: "/collections/:slug", name: "collectionDetail", component: Stub },
@@ -30,8 +33,8 @@ export const routes: RouteRecordRaw[] = [
   { path: "/wiki/pages/:slug", name: "wikiPage", component: Stub },
   { path: "/wiki/graph", name: "wikiGraph", component: Stub },
   { path: "/wiki/lint", name: "wikiLint", component: Stub },
-  // Unknown URLs land on chat.
-  { path: "/:pathMatch(.*)*", redirect: "/" },
+  // Unknown URLs land on the grid.
+  { path: "/:pathMatch(.*)*", redirect: "/terminals" },
 ];
 
 export const router = createRouter({ history: createWebHistory(), routes });

@@ -255,6 +255,7 @@ onUnmounted(() => clearTimeout(draftHintTimer));
 // preparing hint until claude is ready for the prefilled text.
 registerChatOpener((id, opts) => {
   browseClose();
+  router.push("/chat"); // the chat view has no toolbar button — navigate there explicitly
   selectSession(id, opts?.agent ?? "claude");
   if (opts?.draft) showDraftHint();
 });
