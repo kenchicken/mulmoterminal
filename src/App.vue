@@ -346,6 +346,7 @@ function onSession(id: string) {
           </div>
         </Transition>
         <TerminalView
+          v-if="activeId || singleCwd"
           ref="terminalRef"
           class="min-w-0"
           :style="{ flex: `0 0 ${terminalWidth}px` }"
@@ -366,6 +367,13 @@ function onSession(id: string) {
           @cwd="(c) => (activeCwd = c)"
           @run="onRunScript"
         />
+        <div
+          v-else
+          class="flex min-w-0 items-center justify-center font-sans text-[13px] text-dim"
+          :style="{ flex: `0 0 ${terminalWidth}px` }"
+        >
+          Select a session from the list, or start one from the grid.
+        </div>
         <div
           class="shrink-0 grow-0 basis-[5px] cursor-col-resize border-l border-r border-border bg-panel hover:bg-hover focus-visible:bg-accent focus-visible:outline-none"
           role="separator"

@@ -70,7 +70,12 @@ function refreshLastResponse(id: string, cwd: string): void {
 // terminal (and its scrollback). Instead we keep the pty for a grace window; a
 // reattach within it cancels the reap, so a reload just re-attaches to the same
 // running terminal. Only after the window with no reattach do we reap.
-const REAP_GRACE_MS = 30_000;
+// Configurable for cockpit-style use where idle sessions should persist until the user
+// ends them: IDLE_REAP_GRACE_MS=0 (or negative) switches idle auto-close off entirely.
+const IDLE_REAP_GRACE_DEFAULT_MS = 30_000;
+const REAP_GRACE_MS = parseWaitGraceMs(process.env.IDLE_REAP_GRACE_MS, IDLE_REAP_GRACE_DEFAULT_MS, (raw) =>
+  console.warn(`[pty] ignoring non-numeric IDLE_REAP_GRACE_MS=${JSON.stringify(raw)}; using default ${IDLE_REAP_GRACE_DEFAULT_MS}ms`),
+);
 // A detached session that still needs the user — mid-turn output the user hasn't
 // seen, or blocked on a permission/question prompt (the `waiting` flag) — is an
 // unfinished task: reaping it loses work. So it gets a much longer grace than an
